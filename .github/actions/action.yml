@@ -1,4 +1,4 @@
-name: "Release Version"
+name: "Release Trigger"
 description: "A reusable action to handle version release and build information"
 inputs:
   gpg_secret:
