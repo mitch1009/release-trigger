@@ -26,7 +26,7 @@ jobs:
             - uses: actions/checkout@v4.1.7
             - name: Trigger Release
               id: release
-              uses: ./release-trigger@main
+              uses: mitch1009/release-trigger@main
               with:
                 release_branch: main
                 bump_script: release
