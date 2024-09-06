@@ -43,7 +43,7 @@ To use this action in your workflow, include the following in your YAML file:
 ```yaml
 steps:
  - name: Release Version
-   uses: mitch1009/release-trigger@main
+   uses: mitch1009/release-trigger@v1.0.0
    with:
      gpg_secret: ${{ secrets.GPG_SECRET }}
      gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
@@ -70,7 +70,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
     - name: Release Version
-      uses: mitch1009/release-trigger@main
+      uses: mitch1009/release-trigger@v1.0.0
       with:
         gpg_secret: ${{ secrets.GPG_SECRET }}
         gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
