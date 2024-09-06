@@ -33,6 +33,7 @@ outputs:
     description: "Log of pull requests"
     value: ${{ steps.pr-log.outputs.pr-log }}
 runs:
+  using: "composite"
   steps:
     - uses: actions/checkout@v4.1.7
 
@@ -114,7 +115,7 @@ runs:
       shell: bash
       id: release-version
       run: |
-        echo "release-version=$(jq -r '.version' ${inputs.version_file_path})" >> $GITHUB_OUTPUT
+        echo "release-version=$(jq -r '.version' ${{inputs.version_file_path}} )" >> $GITHUB_OUTPUT
 
     - name: Log all variables
       shell: bash
