@@ -22,6 +22,9 @@ inputs:
   release_branch:
     description: "Name of the release branch"
     required: true
+  bump_script:
+    description: "Path to the bump script"
+    required: true
 outputs:
   release_version:
     description: "The version of the release"
@@ -84,7 +87,7 @@ runs:
 
     - name: bump version
       shell: bash
-      run: pnpm dash rel:patch
+      run: pnpm ${{ inputs.bump_script }}
 
     - name: Push to protected branch
       uses: CasperWA/push-protected@v2.16.0
