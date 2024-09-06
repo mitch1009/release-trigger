@@ -33,7 +33,6 @@ outputs:
     description: "Log of pull requests"
     value: ${{ steps.pr-log.outputs.pr-log }}
 runs:
-  using: "composite"
   steps:
     - uses: actions/checkout@v4.1.7
 
