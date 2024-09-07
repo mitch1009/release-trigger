@@ -45,7 +45,7 @@ steps:
  - name: Release Version
    uses: mitch1009/release-trigger@main
    with:
-     gpg_secret: ${{ secrets.GPG_SECRET }}
+     gpg_private_key: ${{ secrets.GPG_SECRET }}
      gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
      git_user_email: "your_email@example.com"
      git_username: "your_username"
@@ -72,7 +72,7 @@ jobs:
     - name: Release Version
       uses: mitch1009/release-trigger@main
       with:
-        gpg_secret: ${{ secrets.GPG_SECRET }}
+        gpg_private_key: ${{ secrets.GPG_SECRET }}
         gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
         git_user_email: "your_email@example.com"
         git_username: "your_username"
