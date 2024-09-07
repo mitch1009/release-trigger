@@ -4,7 +4,7 @@
 This action automates the process of version release and manages build information. It supports signing commits and tags using GPG keys and integrates with GitHub CLI for pull request management.
 
 ## Inputs
-- **gpg_secret**: (required) GPG secret key for signing commits and tags.
+- **gpg_private_key**: (required) GPG secret key for signing commits and tags.
 - **gpg_passphrase**: (required) Passphrase for the GPG key.
 - **git_user_email**: (required) Email for git commits.
 - **git_username**: (required) Username for git commits.
@@ -81,6 +81,7 @@ jobs:
 ```
 
 > Read more about software release guide [here](/release.md)
+
 ## License
 This action is licensed under the MIT License.
 
