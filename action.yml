@@ -132,3 +132,4 @@ runs:
         echo "release-version=${{ steps.release-version.outputs.release-version }}"
         echo "build-number=${{ steps.build-number.outputs.build_number }}"
         echo "pr-log=${{ steps.pr-log.outputs.pr-log }}"
+        echo "pr-logs=${{ steps.pr-log.outputs.pr-log }}"
