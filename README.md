@@ -1,4 +1,4 @@
-# Release Version Action
+# Release Trigger Action
 
 [![Docker trigger](https://github.com/mitch1009/release-trigger/actions/workflows/release.yml/badge.svg)](https://github.com/mitch1009/release-trigger/actions/workflows/release.yml) 
 

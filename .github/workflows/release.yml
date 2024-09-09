@@ -1,79 +1,37 @@
-name: Docker trigger
+name: Docker trigger Build Action
 on:
     push:
         tags:
           - 'v*.*.*'
+env:
+  GH_TOKEN: ${{ secrets.GIT_TOKEN }}
+  GITHUB_TOKEN: ${{ github.token }}
+permissions:
+  contents: write
+  id-token: write
+  pull-requests: write
 jobs:
-  build-docker-image:
-    name: Build Docker Image
-    runs-on: ubuntu-latest
-    outputs:
-      release_version: ${{ steps.version.outputs.version }}
-      pr_log: ${{ steps.pr-log.outputs.pr-log }}
-      commit_log: ${{ steps.pr-log.outputs.commit_log }}
-    steps:
-      - uses: actions/checkout@v4.1.7
-      - name: Build and Push Docker Image
-        run: |
-            echo "standing by mode"
-      - name: get the versin from package.json
-        id: version
-        run: |
-          version=$(jq -r ".version" package.json)
-          echo "version=${version}"
-          echo "version=${version}" >> $GITHUB_OUTPUT
-      - name: Get PR titles and authors
-        id: pr-log
-        env:
-          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
-        run: |
-          PREVIOUS_TAG=$(git describe --tags --always --abbrev=0 HEAD^)
-          PR_LOG=$(gh pr list --search "is:merged merged:>$(git log -1 --format=%aI $PREVIOUS_TAG)" --json title,author --jq '.[] | " \n - [x] " + .title + " by @" + .author.login' | tr '\n' ', ')
-          echo "PR_LOG<<EOF" >>   $GITHUB_ENV
-          echo "$PR_LOG" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-          echo "pr-log=$PR_LOG" >> $GITHUB_OUTPUT
-
-          # extract all commit logs from the last tag
-          git log --pretty=format:"%s" $PREVIOUS_TAG..HEAD
-          # format the commit logs
-          git log --pretty=format:"%s" $PREVIOUS_TAG..HEAD | sed 's/^/- /g'
-          echo "commit_log"=$(git log --pretty=format:"%s" $PREVIOUS_TAG..HEAD | sed 's/^/- /g') >> $GITHUB_OUTPUT
-          
   create-new-release:
     name: Create New Release 🎉
     runs-on: ubuntu-latest
-    needs: [build-docker-image]
-    # check if there is a new tag
-    
     permissions:
       contents: write
       id-token: write
       pull-requests: write
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.7
         with:
-          fetch-depth: 0  # Fetch all history for all tags and branches
-
-      - name: Get contributors
-        env:
-          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
-        run: |
-          CONTRIBUTORS=$(gh api repos/${{ github.repository }}/contributors --jq 'map(.login) | join(", @")')
-          echo "CONTRIBUTORS=@$CONTRIBUTORS" >> $GITHUB_ENV
+          fetch-depth: 0
 
       - name: Create Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
         run: |
-          gh release create v${{ needs.build-docker-image.outputs.release_version }} \
-            --title "v${{ needs.build-docker-image.outputs.release_version }}" \
+          gh release create v$(jq -r ".version" package.json) \
+            --title "v$(jq -r ".version" package.json)" \
             --notes "## 🎍 What's new in this release:
-
-            ${{ needs.build-docker-image.outputs.commit_log }}
             
+            - [x] New Release Trigger v$(jq -r ".version" package.json )
+
             ## 🙏🏾 Thank You:
 
             A big thank you to all our amazing engineers and maintainers

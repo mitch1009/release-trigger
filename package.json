@@ -1,11 +1,12 @@
 {
     "name": "@mitch1009/release-trigger",
     "version": "1.0.5",
-    "description": "",
+    "description": "Release trigger action",
     "main": "index.js",
     "scripts": {
         "release": "standard-version --sign",
         "rel:patch": "pnpm release --tag-prefix patch",
+        "rel:local": "pnpm release --tag-prefix patch",
         "rel:minor": "pnpm release --tag-prefix minor",
         "rel:major": "pnpm release --tag-prefix major"
     },
