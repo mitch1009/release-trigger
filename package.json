@@ -1,8 +1,6 @@
 {
     "name": "@mitch1009/release-trigger",
-
     "version": "1.0.5",
-
     "description": "",
     "main": "index.js",
     "scripts": {
