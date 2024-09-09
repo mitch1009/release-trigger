@@ -1,5 +1,7 @@
 name: "Release Trigger Action"
+
 description: "A reusable action to handle version release and build information"
+# all inputs are required 
 inputs:
   gpg_private_key:
     description: "GPG secret key for signing commits and tags"
@@ -82,7 +84,7 @@ runs:
       shell: bash
       run: pnpm install --no-frozen-lockfile
 
-    - name: Git config
+    - name: Global Git config
       shell: bash
       run: |
         git config --global user.email "${{ inputs.git_user_email }}"
