@@ -32,6 +32,9 @@ outputs:
   pr_log:
     description: "Log of pull requests"
     value: ${{ steps.pr-log.outputs.pr-log }}
+  build_number:
+    description: "The build number"
+    value: ${{ steps.build-number.outputs.build_number }}
 runs:
   using: "composite"
   steps:
@@ -116,7 +119,13 @@ runs:
       id: release-version
       run: |
         echo "release-version=$(jq -r '.version' ${{inputs.version_file_path}} )" >> $GITHUB_OUTPUT
-
+    - name: get build number
+      id: build-number
+      run: |
+        echo "extracting build number"
+        VALUE=$(cat .github/build.yml | xargs)
+        echo "build_number=${VALUE}" >> $GITHUB_OUTPUT
+        echo "build_number=${VALUE}"
     - name: Log all variables
       shell: bash
       run: |
