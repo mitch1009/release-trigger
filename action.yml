@@ -27,6 +27,9 @@ inputs:
   bump_script:
     description: "Path to the bump script"
     required: true
+  release_sha:
+    description: "Release SHA"
+    required: false
 outputs:
   release_version:
     description: "The version of the release"
@@ -123,6 +126,7 @@ runs:
         echo "release-version=$(jq -r '.version' ${{inputs.version_file_path}} )" >> $GITHUB_OUTPUT
     - name: get build number
       id: build-number
+      shell: bash
       run: |
         echo "extracting build number"
         VALUE=$(cat .github/build.yml | xargs)
