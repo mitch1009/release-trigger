@@ -113,7 +113,7 @@ runs:
         GITHUB_TOKEN: ${{ inputs.git_token }}
       run: |
         PREVIOUS_TAG=$(git describe --tags --always --abbrev=0 HEAD^)
-        PR_LOG=$(gh pr list --search "is:merged merged:>$(git log -1 --format=%aI $PREVIOUS_TAG)" --json title,author --jq '.[] | " \n - [x] " + .title + " by @" + .author.login' | tr '\n' ', ')
+        PR_LOG=$(gh pr list --search "is:merged merged:>$(git log -1 --format=%aI $PREVIOUS_TAG)" --json title,author --jq '.[] | "- [x] " + .title + " by @" + .author.login' | tr '\n\n' ', ')
         echo "PR_LOG<<EOF" >>   $GITHUB_ENV
         echo "$PR_LOG" >> $GITHUB_ENV
         echo "EOF" >> $GITHUB_ENV
