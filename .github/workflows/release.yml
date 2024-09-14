@@ -1,4 +1,4 @@
-name: Docker trigger Build Action
+name: Release trigger Build Action
 on:
     push:
         tags:
