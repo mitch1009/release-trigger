@@ -101,7 +101,7 @@ runs:
       uses: CasperWA/push-protected@v2.16.0
       with:
         token: ${{ inputs.git_token }}
-        branch: deploy
+        branch: ${{ inputs.release_branch }}
         tags: true
         force: true
         acceptable_conclusions: success
