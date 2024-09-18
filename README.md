@@ -1,6 +1,6 @@
 # Release Trigger Action
 
-[![Release trigger Build Action](https://github.com/mitch1009/release-trigger/actions/workflows/release.yml/badge.svg)](https://github.com/mitch1009/release-trigger/actions/workflows/release.yml) 
+[![Release trigger Build Action](https://github.com/mitch1009/release-trigger/actions/workflows/release.yml/badge.svg)](https://github.com/mitch1009/release-trigger/actions/workflows/release.yml)
 
 ## Description
 This action automates the process of version release and manages build information. It supports signing commits and tags using GPG keys and integrates with GitHub CLI for pull request management.
