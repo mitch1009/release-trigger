@@ -104,8 +104,8 @@ runs:
       run: |
         pnpm ${{ inputs.bump_script }}
         "version=$(jq -r '.version' package.json)"
-        echo "version=${version}" >> $GITHUB_OUTPUT
-        echo "version=${version}"
+        echo "version=$version" >> $GITHUB_OUTPUT
+        echo "current version $version"
 
     - name: Push to protected branch
       uses: CasperWA/push-protected@v2.16.0
