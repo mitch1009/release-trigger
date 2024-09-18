@@ -31,6 +31,7 @@ jobs:
             --notes "## 🎍 What's new in this release:
             
             - [x] New Release Trigger v$(jq -r ".version" package.json )
+              $(git log --pretty=format:"              - %s" $(git describe --tags --abbrev=0)..HEAD)
 
             ## 🙏🏾 Thank You:
 
