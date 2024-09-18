@@ -124,11 +124,10 @@ runs:
       run: |
         PREVIOUS_TAG=$(git describe --tags --always --abbrev=0 HEAD^)
         PR_LOG=$(gh pr list --search "is:merged merged:>$(git log -1 --format=%aI $PREVIOUS_TAG)" --json title,number,commits --jq '
-                "| PR Title | Commits |",
-                "|----------|---------|",
-                (.[] | "| " + .title + " (#" + (.number|tostring) + ") | " + 
-                (.commits | map(.messageHeadline) | join("\\n| | "))) | 
-                join("\n")
+          [.[] | {title: .title, number: .number, commits: .commits}] | map(
+            "- " + .title + " (#" + (.number|tostring) + ")\n" + 
+            (.commits | map("  - " + .messageHeadline) | join("\n"))
+            ) | join("\n")
         ')
         echo "PR_LOG<<EOF" >>   $GITHUB_ENV
         echo "$PR_LOG" >> $GITHUB_ENV
