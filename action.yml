@@ -30,10 +30,14 @@ inputs:
   release_sha:
     description: "Release SHA"
     required: false
+  working_directory:
+    description: "Working directory"
+    required: true
+    default: "."
 outputs:
   release_version:
     description: "The version of the release"
-    value: ${{ steps.release-version.outputs.release-version }}
+    value: ${{ steps.bump-version.outputs.version }}
   pr_log:
     description: "Log of pull requests"
     value: ${{ steps.pr-log.outputs.pr-log }}
@@ -95,7 +99,11 @@ runs:
 
     - name: bump version
       shell: bash
-      run: pnpm ${{ inputs.bump_script }}
+      working-directory: ${{ inputs.working_directory }}
+      id: bump-version
+      run: |
+        pnpm ${{ inputs.bump_script }}
+        echo "version=$(jq -r '.version' package.json)" >> $GITHUB_OUTPUT
 
     - name: Push to protected branch
       uses: CasperWA/push-protected@v2.16.0
@@ -113,7 +121,7 @@ runs:
         GITHUB_TOKEN: ${{ inputs.git_token }}
       run: |
         PREVIOUS_TAG=$(git describe --tags --always --abbrev=0 HEAD^)
-        PR_LOG=$(gh pr list --search "is:merged merged:>$(git log -1 --format=%aI $PREVIOUS_TAG)" --json title,author --jq '.[] | " - [x] " + .title + " by @" + .author.login' | tr '\n\n' ', ')
+        PR_LOG=$(gh pr list --search "is:merged merged:>$(git log -1 --format=%aI $PREVIOUS_TAG)" --json title,author --jq '.[] | " - [x] " + .title + " by @" + .author.login' | tr ' \n\n ' ', \n')
         echo "PR_LOG<<EOF" >>   $GITHUB_ENV
         echo "$PR_LOG" >> $GITHUB_ENV
         echo "EOF" >> $GITHUB_ENV
