@@ -40,7 +40,7 @@ outputs:
     value: ${{ steps.bump-version.outputs.version }}
   pr_log:
     description: "Log of pull requests"
-    value: ${{ steps.pr-log.outputs.pr-log }}
+    value: ${{ steps.changelog.outputs.changelog }}
   build_number:
     description: "The build number"
     value: ${{ steps.build-number.outputs.build_number }}
@@ -115,24 +115,49 @@ runs:
         tags: true
         force: true
         acceptable_conclusions: success
-
-    - name: Get PR titles and authors
+    - name: Generate Changelog
       shell: bash
-      id: pr-log
+      id: changelog
       env:
         GITHUB_TOKEN: ${{ inputs.git_token }}
       run: |
-        PREVIOUS_TAG=$(git describe --tags --always --abbrev=0 HEAD^)
-        PR_LOG=$(gh pr list --search "is:merged merged:>$(git log -1 --format=%aI $PREVIOUS_TAG)" --json title,number,commits --jq '
-                (.[] | "- " + .title + " (#" + (.number|tostring) + ")\n" + 
-                (.commits | map("  - " + .messageHeadline) | join("\n"))) | 
-                join("\n")
-        ')
-        echo "PR_LOG<<EOF" >>   $GITHUB_ENV
-        echo "$PR_LOG" >> $GITHUB_ENV
-        echo "EOF" >> $GITHUB_ENV
-        echo "pr-log=$PR_LOG" >> $GITHUB_OUTPUT
+        # Get the previous tag, defaulting to the initial commit if no tags exist
+        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
 
+        # Get the date of the previous tag
+        PREVIOUS_TAG_DATE=$(git log -1 --format=%aI $PREVIOUS_TAG)
+
+        # Fetch merged PRs since the previous tag
+        PR_LOG=$(gh pr list \
+          --repo ${{ github.repository }} \
+          --search "is:merged merged:>$PREVIOUS_TAG_DATE" \
+          --json number,title,author \
+          --jq '
+            [.[] | "- " + .title + " (#" + (.number|tostring) + ") by @" + .author.login] | join("\n")
+          '
+        )
+
+        if [ $? -ne 0 ]; then
+          echo "Error fetching PR list. Check your GitHub token permissions."
+          exit 1
+        fi
+
+        # Generate changelog
+        CHANGELOG="Changes since $PREVIOUS_TAG:\n$PR_LOG"
+
+        # Escape the changelog content for GitHub Actions output
+        CHANGELOG_ESCAPED="${CHANGELOG//'%'/'%25'}"
+        CHANGELOG_ESCAPED="${CHANGELOG_ESCAPED//$'\n'/'%0A'}"
+        CHANGELOG_ESCAPED="${CHANGELOG_ESCAPED//$'\r'/'%0D'}"
+
+        # Output to GITHUB_OUTPUT
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        echo "$CHANGELOG_ESCAPED" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+        # Display the changelog in the action logs
+        echo -e "$CHANGELOG"
+   
     - name: Release Version
       shell: bash
       id: release-version
