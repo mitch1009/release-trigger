@@ -1,6 +1,8 @@
 name: "Release Trigger Action"
 author: "mitch1009"
-
+branding:
+  icon: "umbrella"
+  color: "green"
 description: "A reusable action to handle version release and build information"
 # all inputs are required 
 inputs:
