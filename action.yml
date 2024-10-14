@@ -1,4 +1,5 @@
 name: "Release Trigger Action"
+author: "mitch1009"
 
 description: "A reusable action to handle version release and build information"
 # all inputs are required 
