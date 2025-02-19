@@ -106,7 +106,7 @@ runs:
       id: bump-version
       run: |
         pnpm ${{ inputs.bump_script }}
-        version=$(jq -r '.version' package.json)
+        version=$(jq -r '.version' ${{ inputs.version_file_path }})
         echo "version=$version" >> $GITHUB_OUTPUT
         echo "current version $version"
 
