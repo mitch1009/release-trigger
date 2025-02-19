@@ -1,6 +1,6 @@
 {
     "name": "@mitch1009/release-trigger",
-    "version": "1.2.5",
+    "version": "1.2.6",
     "description": "Release trigger action",
     "main": "index.js",
     "scripts": {
