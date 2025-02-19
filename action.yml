@@ -83,7 +83,7 @@ runs:
         run_install: false
 
     - name: set pnpm cache
-      uses: actions/cache@v4.0.2
+      uses: actions/cache@v4.2.1
       with:
         path: ~/.pnpm-store
         key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
