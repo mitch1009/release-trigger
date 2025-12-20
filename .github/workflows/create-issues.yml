@@ -38,16 +38,17 @@ jobs:
 
       - name: Authenticate GitHub CLI
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "$GITHUB_TOKEN" | gh auth login --with-token
+          # GitHub CLI automatically uses GH_TOKEN environment variable
+          gh auth status
 
       - name: Make parse script executable
         run: chmod +x .github/scripts/parse-issues.sh
 
       - name: Create or update labels
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Create labels if they don't exist
           gh label create "enhancement" --repo "${{ github.repository }}" --color "0E8A16" --description "New feature or enhancement" --force 2>/dev/null || true
@@ -56,6 +57,7 @@ jobs:
 
       - name: Parse ISSUES.md and create issues
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           .github/scripts/parse-issues.sh \
