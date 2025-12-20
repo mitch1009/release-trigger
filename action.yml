@@ -22,14 +22,14 @@ inputs:
     description: "GitHub token for accessing GitHub API"
     required: true
   version_file_path:
-    description: "Path to the version file"
-    required: true
+    description: "Path to the version file (auto-detected if not provided)"
+    required: false
   release_branch:
     description: "Name of the release branch"
     required: true
   bump_script:
-    description: "Path to the bump script"
-    required: true
+    description: "Path to the bump script (language-specific defaults if not provided)"
+    required: false
   release_sha:
     description: "Release SHA"
     required: false
@@ -37,6 +37,10 @@ inputs:
     description: "Working directory"
     required: true
     default: "."
+  language:
+    description: "Project language (rust, python, js, ts, or auto-detect)"
+    required: false
+    default: "auto"
 outputs:
   release_version:
     description: "The version of the release"
@@ -51,11 +55,6 @@ runs:
   using: "composite"
   steps:
     - uses: actions/checkout@v4.1.7
-
-    - name: setup node
-      uses: actions/setup-node@v4.0.3
-      with:
-        node-version: "20.x"
 
     - name: Install GitHub CLI
       shell: bash
@@ -76,13 +75,54 @@ runs:
         git_commit_gpgsign: true
         git_tag_gpgsign: true
 
-    - name: setup pnpm
+    - name: Global Git config
+      shell: bash
+      run: |
+        git config --global user.email "${{ inputs.git_user_email }}"
+        git config --global user.name "${{ inputs.git_username }}"
+
+    - name: Detect project language
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      id: detect-language
+      run: |
+        LANGUAGE="${{ inputs.language }}"
+        
+        if [ "$LANGUAGE" = "auto" ] || [ -z "$LANGUAGE" ]; then
+          # Auto-detect language
+          if [ -f "Cargo.toml" ]; then
+            LANGUAGE="rust"
+            echo "Detected Rust project (Cargo.toml found)"
+          elif [ -f "pyproject.toml" ] || [ -f "setup.py" ] || [ -f "setup.cfg" ] || find . -maxdepth 2 -name "__version__.py" -o -name "version.py" | grep -q .; then
+            LANGUAGE="python"
+            echo "Detected Python project"
+          elif [ -f "package.json" ]; then
+            LANGUAGE="js"
+            echo "Detected JavaScript/TypeScript project (package.json found)"
+          else
+            echo "Error: Could not detect project language. Please specify 'language' input."
+            exit 1
+          fi
+        fi
+        
+        echo "language=$LANGUAGE" >> $GITHUB_OUTPUT
+        echo "Using language: $LANGUAGE"
+
+    - name: Setup Node.js (for JS/TS projects)
+      if: steps.detect-language.outputs.language == 'js' || steps.detect-language.outputs.language == 'ts'
+      uses: actions/setup-node@v4.0.3
+      with:
+        node-version: "20.x"
+
+    - name: Setup pnpm (for JS/TS projects)
+      if: steps.detect-language.outputs.language == 'js' || steps.detect-language.outputs.language == 'ts'
       uses: pnpm/action-setup@v4.0.0
       with:
         version: 9.6.0
         run_install: false
 
-    - name: set pnpm cache
+    - name: Set pnpm cache (for JS/TS projects)
+      if: steps.detect-language.outputs.language == 'js' || steps.detect-language.outputs.language == 'ts'
       uses: actions/cache@v4.2.1
       with:
         path: ~/.pnpm-store
@@ -90,25 +130,227 @@ runs:
         restore-keys: |
           ${{ runner.os }}-pnpm-
 
-    - name: pnpm install and build
+    - name: Install dependencies (for JS/TS projects)
+      if: steps.detect-language.outputs.language == 'js' || steps.detect-language.outputs.language == 'ts'
       shell: bash
       run: pnpm install --no-frozen-lockfile
 
-    - name: Global Git config
+    - name: Setup Rust toolchain (for Rust projects)
+      if: steps.detect-language.outputs.language == 'rust'
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        components: rustfmt, clippy
+
+    - name: Cache Cargo dependencies (for Rust projects)
+      if: steps.detect-language.outputs.language == 'rust'
+      uses: actions/cache@v4.2.1
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          ${{ inputs.working_directory }}/target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
+    - name: Install cargo-release (for Rust projects)
+      if: steps.detect-language.outputs.language == 'rust'
       shell: bash
       run: |
-        git config --global user.email "${{ inputs.git_user_email }}"
-        git config --global user.name "${{ inputs.git_username }}"
+        if ! command -v cargo-release &> /dev/null; then
+          cargo install cargo-release --locked
+        fi
 
-    - name: bump version
+    - name: Setup Python (for Python projects)
+      if: steps.detect-language.outputs.language == 'python'
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Cache pip dependencies (for Python projects)
+      if: steps.detect-language.outputs.language == 'python'
+      uses: actions/cache@v4.2.1
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt', '**/pyproject.toml', '**/setup.py') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install bump2version (for Python projects)
+      if: steps.detect-language.outputs.language == 'python'
+      shell: bash
+      run: |
+        pip install --upgrade pip
+        pip install bump2version
+
+    - name: Auto-detect version file path
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      id: detect-version-file
+      run: |
+        LANGUAGE="${{ steps.detect-language.outputs.language }}"
+        VERSION_FILE="${{ inputs.version_file_path }}"
+        
+        if [ -z "$VERSION_FILE" ] || [ "$VERSION_FILE" = "" ]; then
+          # Auto-detect version file based on language
+          case "$LANGUAGE" in
+            rust)
+              if [ -f "Cargo.toml" ]; then
+                VERSION_FILE="Cargo.toml"
+              else
+                echo "Error: Cargo.toml not found"
+                exit 1
+              fi
+              ;;
+            python)
+              if [ -f "pyproject.toml" ]; then
+                VERSION_FILE="pyproject.toml"
+              elif [ -f "setup.py" ]; then
+                VERSION_FILE="setup.py"
+              elif [ -f "setup.cfg" ]; then
+                VERSION_FILE="setup.cfg"
+              else
+                VERSION_FILE=$(find . -maxdepth 2 -name "__version__.py" -o -name "version.py" | head -n 1)
+                if [ -z "$VERSION_FILE" ]; then
+                  echo "Error: Could not find Python version file"
+                  exit 1
+                fi
+              fi
+              ;;
+            js|ts)
+              if [ -f "package.json" ]; then
+                VERSION_FILE="package.json"
+              else
+                echo "Error: package.json not found"
+                exit 1
+              fi
+              ;;
+          esac
+        fi
+        
+        echo "version_file=$VERSION_FILE" >> $GITHUB_OUTPUT
+        echo "Using version file: $VERSION_FILE"
+
+    - name: Bump version
       shell: bash
       working-directory: ${{ inputs.working_directory }}
       id: bump-version
       run: |
-        pnpm ${{ inputs.bump_script }}
-        version=$(jq -r '.version' ${{ inputs.version_file_path }})
-        echo "version=$version" >> $GITHUB_OUTPUT
-        echo "current version $version"
+        LANGUAGE="${{ steps.detect-language.outputs.language }}"
+        VERSION_FILE="${{ steps.detect-version-file.outputs.version_file }}"
+        BUMP_SCRIPT="${{ inputs.bump_script }}"
+        
+        case "$LANGUAGE" in
+          rust)
+            # Use cargo-release if available, otherwise manual bump
+            if command -v cargo-release &> /dev/null; then
+              if [ -n "$BUMP_SCRIPT" ] && [ "$BUMP_SCRIPT" != "" ]; then
+                # Custom script provided
+                bash -c "$BUMP_SCRIPT"
+              else
+                # Default: use cargo-release for patch bump (can be enhanced)
+                cargo release patch --execute --no-publish --no-push || {
+                  # Fallback: manual version bump
+                  echo "cargo-release failed, using manual version bump"
+                  CURRENT_VERSION=$(grep -E '^version\s*=' "$VERSION_FILE" | head -n 1 | sed -E 's/^version\s*=\s*"([^"]+)".*/\1/')
+                  if [ -z "$CURRENT_VERSION" ]; then
+                    echo "Error: Could not read version from $VERSION_FILE"
+                    exit 1
+                  fi
+                  # Bump patch version
+                  NEW_VERSION=$(echo "$CURRENT_VERSION" | awk -F. '{printf "%d.%d.%d", $1, $2, $3+1}')
+                  sed -i.bak "s/^version\s*=\s*\"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" "$VERSION_FILE"
+                  rm -f "${VERSION_FILE}.bak"
+                }
+              fi
+            else
+              # Manual version bump
+              CURRENT_VERSION=$(grep -E '^version\s*=' "$VERSION_FILE" | head -n 1 | sed -E 's/^version\s*=\s*"([^"]+)".*/\1/')
+              if [ -z "$CURRENT_VERSION" ]; then
+                echo "Error: Could not read version from $VERSION_FILE"
+                exit 1
+              fi
+              NEW_VERSION=$(echo "$CURRENT_VERSION" | awk -F. '{printf "%d.%d.%d", $1, $2, $3+1}')
+              sed -i.bak "s/^version\s*=\s*\"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" "$VERSION_FILE"
+              rm -f "${VERSION_FILE}.bak"
+            fi
+            # Read version from Cargo.toml
+            VERSION=$(grep -E '^version\s*=' "$VERSION_FILE" | head -n 1 | sed -E 's/^version\s*=\s*"([^"]+)".*/\1/')
+            ;;
+          python)
+            if [ -n "$BUMP_SCRIPT" ] && [ "$BUMP_SCRIPT" != "" ]; then
+              # Custom script provided
+              bash -c "$BUMP_SCRIPT"
+            else
+              # Use bump2version if .bumpversion.cfg exists, otherwise manual bump
+              if [ -f ".bumpversion.cfg" ] || [ -f "setup.cfg" ]; then
+                bump2version patch --verbose
+              else
+                # Manual version bump for pyproject.toml
+                if [ -f "pyproject.toml" ]; then
+                  CURRENT_VERSION=$(grep -E '^\s*version\s*=\s*"' "$VERSION_FILE" | head -n 1 | sed -E 's/^\s*version\s*=\s*"([^"]+)".*/\1/')
+                  if [ -z "$CURRENT_VERSION" ]; then
+                    echo "Error: Could not read version from $VERSION_FILE"
+                    exit 1
+                  fi
+                  NEW_VERSION=$(echo "$CURRENT_VERSION" | awk -F. '{printf "%d.%d.%d", $1, $2, $3+1}')
+                  sed -i.bak "s/^\s*version\s*=\s*\"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" "$VERSION_FILE"
+                  rm -f "${VERSION_FILE}.bak"
+                # Manual version bump for setup.py
+                elif [ -f "setup.py" ]; then
+                  CURRENT_VERSION=$(grep -E "version\s*=\s*['\"]" "$VERSION_FILE" | head -n 1 | sed -E "s/.*version\s*=\s*['\"]([^'\"]+)['\"].*/\1/")
+                  if [ -z "$CURRENT_VERSION" ]; then
+                    echo "Error: Could not read version from $VERSION_FILE"
+                    exit 1
+                  fi
+                  NEW_VERSION=$(echo "$CURRENT_VERSION" | awk -F. '{printf "%d.%d.%d", $1, $2, $3+1}')
+                  sed -i.bak "s/version\s*=\s*['\"]$CURRENT_VERSION['\"]/version = \"$NEW_VERSION\"/" "$VERSION_FILE"
+                  rm -f "${VERSION_FILE}.bak"
+                # Manual version bump for __version__.py
+                elif echo "$VERSION_FILE" | grep -q "version.py"; then
+                  CURRENT_VERSION=$(grep -E "__version__\s*=\s*['\"]" "$VERSION_FILE" | head -n 1 | sed -E "s/.*__version__\s*=\s*['\"]([^'\"]+)['\"].*/\1/")
+                  if [ -z "$CURRENT_VERSION" ]; then
+                    echo "Error: Could not read version from $VERSION_FILE"
+                    exit 1
+                  fi
+                  NEW_VERSION=$(echo "$CURRENT_VERSION" | awk -F. '{printf "%d.%d.%d", $1, $2, $3+1}')
+                  sed -i.bak "s/__version__\s*=\s*['\"]$CURRENT_VERSION['\"]/__version__ = \"$NEW_VERSION\"/" "$VERSION_FILE"
+                  rm -f "${VERSION_FILE}.bak"
+                fi
+              fi
+            fi
+            # Read version based on file type
+            if [ -f "pyproject.toml" ]; then
+              VERSION=$(grep -E '^\s*version\s*=\s*"' "$VERSION_FILE" | head -n 1 | sed -E 's/^\s*version\s*=\s*"([^"]+)".*/\1/')
+            elif [ -f "setup.py" ]; then
+              VERSION=$(grep -E "version\s*=\s*['\"]" "$VERSION_FILE" | head -n 1 | sed -E "s/.*version\s*=\s*['\"]([^'\"]+)['\"].*/\1/")
+            elif echo "$VERSION_FILE" | grep -q "version.py"; then
+              VERSION=$(grep -E "__version__\s*=\s*['\"]" "$VERSION_FILE" | head -n 1 | sed -E "s/.*__version__\s*=\s*['\"]([^'\"]+)['\"].*/\1/")
+            fi
+            ;;
+          js|ts)
+            if [ -n "$BUMP_SCRIPT" ] && [ "$BUMP_SCRIPT" != "" ]; then
+              pnpm $BUMP_SCRIPT
+            else
+              # Default: use standard-version
+              pnpm release || npx standard-version --sign
+            fi
+            # Read version from package.json
+            VERSION=$(jq -r '.version' "$VERSION_FILE")
+            ;;
+        esac
+        
+        if [ -z "$VERSION" ]; then
+          echo "Error: Could not determine version after bump"
+          exit 1
+        fi
+        
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Bumped to version: $VERSION"
 
     - name: Push to protected branch
       uses: CasperWA/push-protected@v2.16.0
@@ -163,9 +405,31 @@ runs:
    
     - name: Release Version
       shell: bash
+      working-directory: ${{ inputs.working_directory }}
       id: release-version
       run: |
-        echo "release-version=$(jq -r '.version' ${{inputs.version_file_path}} )" >> $GITHUB_OUTPUT
+        LANGUAGE="${{ steps.detect-language.outputs.language }}"
+        VERSION_FILE="${{ steps.detect-version-file.outputs.version_file }}"
+        
+        case "$LANGUAGE" in
+          rust)
+            VERSION=$(grep -E '^version\s*=' "$VERSION_FILE" | head -n 1 | sed -E 's/^version\s*=\s*"([^"]+)".*/\1/')
+            ;;
+          python)
+            if [ -f "pyproject.toml" ]; then
+              VERSION=$(grep -E '^\s*version\s*=\s*"' "$VERSION_FILE" | head -n 1 | sed -E 's/^\s*version\s*=\s*"([^"]+)".*/\1/')
+            elif [ -f "setup.py" ]; then
+              VERSION=$(grep -E "version\s*=\s*['\"]" "$VERSION_FILE" | head -n 1 | sed -E "s/.*version\s*=\s*['\"]([^'\"]+)['\"].*/\1/")
+            elif echo "$VERSION_FILE" | grep -q "version.py"; then
+              VERSION=$(grep -E "__version__\s*=\s*['\"]" "$VERSION_FILE" | head -n 1 | sed -E "s/.*__version__\s*=\s*['\"]([^'\"]+)['\"].*/\1/")
+            fi
+            ;;
+          js|ts)
+            VERSION=$(jq -r '.version' "$VERSION_FILE")
+            ;;
+        esac
+        
+        echo "release-version=$VERSION" >> $GITHUB_OUTPUT
     - name: get build number
       id: build-number
       shell: bash

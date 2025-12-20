@@ -1,0 +1,74 @@
+name: Create Issues from ISSUES.md
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - '.github/ISSUES.md'
+  workflow_dispatch:
+    inputs:
+      force_recreate:
+        description: 'Force recreate all issues (will skip existing check)'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  create-issues:
+    name: Create GitHub Issues
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install GitHub CLI
+        run: |
+          type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+          && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+          && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+          && sudo apt update \
+          && sudo apt install gh -y
+
+      - name: Authenticate GitHub CLI
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GITHUB_TOKEN" | gh auth login --with-token
+
+      - name: Make parse script executable
+        run: chmod +x .github/scripts/parse-issues.sh
+
+      - name: Create or update labels
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create labels if they don't exist
+          gh label create "enhancement" --repo "${{ github.repository }}" --color "0E8A16" --description "New feature or enhancement" --force 2>/dev/null || true
+          gh label create "automated" --repo "${{ github.repository }}" --color "1D76DB" --description "Automatically created issue" --force 2>/dev/null || true
+          gh label create "multi-language" --repo "${{ github.repository }}" --color "B60205" --description "Multi-language support feature" --force 2>/dev/null || true
+
+      - name: Parse ISSUES.md and create issues
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          .github/scripts/parse-issues.sh \
+            .github/ISSUES.md \
+            "${{ secrets.GITHUB_TOKEN }}" \
+            "${{ github.repository_owner }}" \
+            "${{ github.event.repository.name }}"
+
+      - name: Summary
+        run: |
+          echo "## Issues Creation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Successfully parsed ISSUES.md and created/updated GitHub issues" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the [Issues page](https://github.com/${{ github.repository }}/issues) to see the created issues." >> $GITHUB_STEP_SUMMARY
+
